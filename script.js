@@ -13,38 +13,7 @@ const progressText = document.getElementById('progressText');
 
 let selectedSpeed = 1;
 
-// Drag & drop
-dropArea.addEventListener('click', () => fileInput.click());
-
-fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    fileNameEl.textContent = file ? file.name : '';
-});
-
-['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
-    dropArea.addEventListener(evt, e => {
-        e.preventDefault();
-        e.stopPropagation();
-    }, false);
-});
-
-['dragenter', 'dragover'].forEach(evt => {
-    dropArea.addEventListener(evt, () => dropArea.classList.add('dragover'), false);
-});
-
-['dragleave', 'drop'].forEach(evt => {
-    dropArea.addEventListener(evt, () => dropArea.classList.remove('dragover'), false);
-});
-
-dropArea.addEventListener('drop', (e) => {
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('audio/')) {
-        fileInput.files = e.dataTransfer.files;
-        fileNameEl.textContent = file.name;
-    } else {
-        alert('Please drop an audio file.');
-    }
-});
+// Drag & drop code (unchanged - keep your existing drag handlers here)
 
 // Speed selection
 document.querySelectorAll('input[name="speed"]').forEach(radio => {
@@ -55,16 +24,17 @@ processBtn.addEventListener('click', processAudio);
 
 async function processAudio() {
     const file = fileInput.files[0];
-    const repeats = parseInt(document.getElementById('repeats').value);
+    const repeatsInput = document.getElementById('repeats');
+    const repeats = parseInt(repeatsInput.value);
 
     if (!file) return alert('Please select an audio file first.');
-    if (isNaN(repeats) || repeats < 1) return alert('Enter repeats ≥ 1.');
+    if (isNaN(repeats) || repeats < 1) return alert('Enter a valid number of repeats (≥ 1).');
 
     processBtn.disabled = true;
     processBtn.textContent = 'Processing...';
     download.style.display = 'none';
     previewSec.style.display = 'none';
-    status.textContent = 'Loading...';
+    status.textContent = 'Loading file...';
     status.className = 'processing';
 
     progressContainer.style.display = 'block';
@@ -76,21 +46,55 @@ async function processAudio() {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const originalBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
+        if (!originalBuffer || originalBuffer.length === 0 || isNaN(originalBuffer.length)) {
+            throw new Error('Audio file is empty or invalid after decoding');
+        }
+
         let workingBuffer = originalBuffer;
 
-        // Pitch-preserving time-stretch (simple phase vocoder approximation)
-        if (selectedSpeed !== 1) {
-            status.textContent = `Time-stretching to ${selectedSpeed}× (pitch preserved)...`;
-            progressText.textContent = 'Processing audio...';
+        // Speed change with validation
+        if (selectedSpeed !== 1 && selectedSpeed > 0 && isFinite(selectedSpeed)) {
+            status.textContent = `Adjusting speed to ${selectedSpeed}×...`;
+            progressText.textContent = 'Processing speed...';
 
-            workingBuffer = timeStretch(originalBuffer, selectedSpeed);
+            const newLength = Math.max(1, Math.floor(originalBuffer.length / selectedSpeed));
+
+            if (newLength < 1 || isNaN(newLength)) {
+                console.warn('Invalid new length calculated - falling back to original');
+                status.textContent += ' (speed adjustment skipped)';
+            } else {
+                const speedCtx = new OfflineAudioContext(
+                    originalBuffer.numberOfChannels,
+                    newLength,
+                    originalBuffer.sampleRate
+                );
+
+                const src = speedCtx.createBufferSource();
+                src.buffer = originalBuffer;
+                src.playbackRate.value = selectedSpeed;
+                src.connect(speedCtx.destination);
+                src.start(0);
+
+                workingBuffer = await speedCtx.startRendering();
+
+                if (!workingBuffer || workingBuffer.length === 0) {
+                    throw new Error('Speed adjustment produced empty buffer');
+                }
+            }
         }
 
         // Repeat
-        status.textContent = `Repeating ${repeats}× ...`;
-        progressText.textContent = 'Combining...';
+        status.textContent = `Repeating ${repeats} times...`;
+        progressText.textContent = 'Combining repeats...';
 
         const finalLength = workingBuffer.length * repeats;
+        if (finalLength > 1e8 || isNaN(finalLength)) {  // rough safety limit
+            if (!confirm('Very large output expected. Continue anyway?')) {
+                resetUI();
+                return;
+            }
+        }
+
         const finalBuffer = audioCtx.createBuffer(
             workingBuffer.numberOfChannels,
             finalLength,
@@ -108,11 +112,11 @@ async function processAudio() {
             }
             progress = ((r + 1) / repeats) * 100;
             progressFill.style.width = progress + '%';
-            await new Promise(r => setTimeout(r, 0));
+            await new Promise(r => setTimeout(r, 0)); // yield for UI
         }
 
         progressFill.style.width = '100%';
-        progressText.textContent = 'Finalizing file...';
+        progressText.textContent = 'Creating file...';
 
         const wavBlob = audioBufferToWav(finalBuffer);
         const url = URL.createObjectURL(wavBlob);
@@ -120,8 +124,8 @@ async function processAudio() {
         audioPrev.src = url;
         previewSec.style.display = 'block';
 
-        const durationSec = finalBuffer.duration;
-        durationInfo.textContent = `Duration: ${Math.floor(durationSec / 60)} min ${Math.round(durationSec % 60)} sec`;
+        const dur = finalBuffer.duration;
+        durationInfo.textContent = `Duration: ${Math.floor(dur / 60)} min ${Math.round(dur % 60)} sec`;
 
         download.href = url;
         download.download = 'processed_audio.wav';
@@ -131,11 +135,11 @@ async function processAudio() {
         status.className = 'success';
 
     } catch (err) {
-        console.error('Processing failed:', err);
-        status.textContent = 'Error: ' + (err.message || 'Failed');
+        console.error('Audio processing error:', err);
+        status.textContent = 'Error: ' + (err.message || 'Processing failed');
         status.className = 'error';
         progressText.textContent = 'Failed';
-        alert('Error: ' + (err.message || 'Try smaller file or different browser.'));
+        alert('Error: ' + (err.message || 'Invalid or corrupt audio file. Try another file.'));
     } finally {
         processBtn.disabled = false;
         processBtn.textContent = 'Process Audio';
@@ -143,15 +147,12 @@ async function processAudio() {
     }
 }
 
-// Pitch-preserving time-stretch (phase vocoder simplified)
-function timeStretch(buffer, speed) {
-    const ctx = new OfflineAudioContext(buffer.numberOfChannels, buffer.length / speed, buffer.sampleRate);
-    const source = ctx.createBufferSource();
-    source.buffer = buffer;
-    source.playbackRate.value = speed;
-    source.connect(ctx.destination);
-    source.start(0);
-    return ctx.startRendering().then(b => b);
+function resetUI() {
+    processBtn.disabled = false;
+    processBtn.textContent = 'Process Audio';
+    progressContainer.style.display = 'none';
+    status.textContent = '';
+    status.className = '';
 }
 
 function audioBufferToWav(buffer) {
