@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audio Repeater - Repeat Audio Files Online</title>
-    <meta name="description" content="Upload your audio file, set the number of repeats, and download one combined file. Free and simple.">
+    <meta name="description" content="Upload your audio file or YouTube link, set the number of repeats, and download one combined file. Free and simple.">
     <meta name="theme-color" content="#4f46e5">
     <link rel="manifest" href="manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,17 +16,22 @@
     <header>
         <div class="container">
             <h1 class="logo">Audio Repeater</h1>
-            <p class="tagline">Repeat your audio files easily — online & free</p>
+            <p class="tagline">Repeat your audio files or YouTube videos easily — online & free</p>
         </div>
     </header>
 
     <main>
         <div class="container">
             <div class="tool-card">
-                <p class="subtitle">Upload your audio, choose how many times to repeat it, and download one combined file.</p>
+                <p class="subtitle">Upload an audio file or paste a YouTube link, choose how many times to repeat it, and download one combined file.</p>
 
                 <div class="form-group">
-                    <label>Select or Drop Audio File</label>
+                    <label for="youtubeUrl">YouTube Video Link (optional)</label>
+                    <input type="text" id="youtubeUrl" placeholder="e.g. https://www.youtube.com/watch?v=VIDEO_ID">
+                </div>
+
+                <div class="form-group">
+                    <label>Select or Drop Audio File (if not using YouTube)</label>
                     <div id="dropArea" class="drop-area">
                         <p>Drag & drop your file here or click to browse</p>
                         <input type="file" id="audioFile" accept="audio/*">
@@ -56,6 +61,8 @@
                 </div>
 
                 <a id="download" style="display: none;">Download Repeated Audio (WAV)</a>
+
+                <p class="note" style="margin-top: 32px; color: var(--gray); font-size: 0.9rem; text-align: center;">Note: For YouTube links, we use a free API (sign up at RapidAPI for a key if needed). Inspired by Y2mate for simple link input and audio download.</p>
             </div>
         </div>
     </main>
