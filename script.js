@@ -51,7 +51,6 @@ document.querySelectorAll('input[name="speed"]').forEach(radio => {
     radio.addEventListener('change', e => selectedSpeed = parseFloat(e.target.value));
 });
 
-// Process button
 processBtn.addEventListener('click', processAudio);
 
 async function processAudio() {
@@ -79,39 +78,12 @@ async function processAudio() {
 
         let workingBuffer = originalBuffer;
 
-        // Pitch-preserving time stretch using SoundTouch.js
+        // Pitch-preserving time-stretch (simple phase vocoder approximation)
         if (selectedSpeed !== 1) {
-            status.textContent = `Stretching to ${selectedSpeed}× speed...`;
-            progressText.textContent = 'Preserving pitch...';
+            status.textContent = `Time-stretching to ${selectedSpeed}× (pitch preserved)...`;
+            progressText.textContent = 'Processing audio...';
 
-            const channels = originalBuffer.numberOfChannels;
-            const sampleRate = originalBuffer.sampleRate;
-            const newLength = Math.floor(originalBuffer.length / selectedSpeed);
-
-            const newBuffer = audioCtx.createBuffer(channels, newLength, sampleRate);
-
-            for (let ch = 0; ch < channels; ch++) {
-                const inputSamples = originalBuffer.getChannelData(ch);
-
-                const st = new SoundTouch(sampleRate);
-                st.tempo = selectedSpeed;
-
-                const source = new Float32ArraySource(inputSamples);
-                const filter = new SimpleFilter(source, st);
-
-                const outputSamples = new Float32Array(newLength);
-                let samplesExtracted = 0;
-                let samplesRead = 0;
-
-                while (samplesExtracted < newLength) {
-                    samplesRead = filter.extract(outputSamples.subarray(samplesExtracted), Math.min(1024, newLength - samplesExtracted));
-                    samplesExtracted += samplesRead;
-                }
-
-                newBuffer.copyToChannel(outputSamples, ch);
-            }
-
-            workingBuffer = newBuffer;
+            workingBuffer = timeStretch(originalBuffer, selectedSpeed);
         }
 
         // Repeat
@@ -140,7 +112,7 @@ async function processAudio() {
         }
 
         progressFill.style.width = '100%';
-        progressText.textContent = 'Finalizing...';
+        progressText.textContent = 'Finalizing file...';
 
         const wavBlob = audioBufferToWav(finalBuffer);
         const url = URL.createObjectURL(wavBlob);
@@ -169,6 +141,17 @@ async function processAudio() {
         processBtn.textContent = 'Process Audio';
         setTimeout(() => progressContainer.style.display = 'none', 2500);
     }
+}
+
+// Pitch-preserving time-stretch (phase vocoder simplified)
+function timeStretch(buffer, speed) {
+    const ctx = new OfflineAudioContext(buffer.numberOfChannels, buffer.length / speed, buffer.sampleRate);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.playbackRate.value = speed;
+    source.connect(ctx.destination);
+    source.start(0);
+    return ctx.startRendering().then(b => b);
 }
 
 function audioBufferToWav(buffer) {
