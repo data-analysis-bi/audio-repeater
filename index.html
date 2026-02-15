@@ -43,9 +43,16 @@
 
                 <div id="status"></div>
 
-                <div id="previewSection" style="display: none;">
+                <div id="progressContainer" style="display: none; margin: 24px 0;">
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill"></div>
+                    </div>
+                    <div id="progressText" style="text-align: center; margin-top: 10px; font-size: 0.95rem; font-weight: 500; color: var(--gray);"></div>
+                </div>
+
+                <div id="previewSection" style="display: none; margin: 32px 0; text-align: center;">
                     <h3>Preview Repeated Audio</h3>
-                    <audio id="audioPreview" controls></audio>
+                    <audio id="audioPreview" controls style="width: 100%; max-width: 500px;"></audio>
                 </div>
 
                 <a id="download" style="display: none;">Download Repeated Audio (WAV)</a>
