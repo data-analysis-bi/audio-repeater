@@ -1,32 +1,36 @@
-const dropArea    = document.getElementById('dropArea');
-const fileInput   = document.getElementById('audioFile');
-const fileNameEl  = document.getElementById('fileName');
-const youtubeUrlInput = document.getElementById('youtubeUrl');
-const status      = document.getElementById('status');
-const download    = document.getElementById('download');
-const previewSec  = document.getElementById('previewSection');
-const audioPrev   = document.getElementById('audioPreview');
-const repeatBtn   = document.getElementById('repeatButton');
+const dropArea     = document.getElementById('dropArea');
+const fileInput    = document.getElementById('audioFile');
+const fileNameEl   = document.getElementById('fileName');
+const status       = document.getElementById('status');
+const download     = document.getElementById('download');
+const previewSec   = document.getElementById('previewSection');
+const audioPrev    = document.getElementById('audioPreview');
+const repeatBtn    = document.getElementById('repeatButton');
 const progressContainer = document.getElementById('progressContainer');
 const progressFill = document.getElementById('progressFill');
 const progressText = document.getElementById('progressText');
 
-// Replace with your RapidAPI key for Youtube to Mp3 API
-const RAPID_API_KEY = 'YOUR_RAPIDAPI_KEY_HERE'; // Sign up at https://rapidapi.com/CoolGuruji/api/youtube-to-mp3-download and get a free key
+// Speed button logic
+let selectedSpeed = 1;
+document.querySelectorAll('.speed-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedSpeed = parseFloat(btn.dataset.speed);
+    });
+});
 
-// Drag & drop for file
+// Drag & drop
 dropArea.addEventListener('click', () => fileInput.click());
 
-fileInput.addEventListener('change', (e) => {
+fileInput.addEventListener('change', e => {
     const file = e.target.files[0];
     fileNameEl.textContent = file ? file.name : '';
 });
 
+// Drag events
 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
-    dropArea.addEventListener(evt, e => {
-        e.preventDefault();
-        e.stopPropagation();
-    }, false);
+    dropArea.addEventListener(evt, e => e.preventDefault() && e.stopPropagation(), false);
 });
 
 ['dragenter', 'dragover'].forEach(evt => {
@@ -37,7 +41,7 @@ fileInput.addEventListener('change', (e) => {
     dropArea.addEventListener(evt, () => dropArea.classList.remove('dragover'), false);
 });
 
-dropArea.addEventListener('drop', (e) => {
+dropArea.addEventListener('drop', e => {
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith('audio/')) {
         fileInput.files = e.dataTransfer.files;
@@ -47,15 +51,14 @@ dropArea.addEventListener('drop', (e) => {
     }
 });
 
-repeatBtn.addEventListener('click', repeatAudio);
+repeatBtn.addEventListener('click', processAudio);
 
-async function repeatAudio() {
-    const youtubeUrl = youtubeUrlInput.value.trim();
+async function processAudio() {
     const file = fileInput.files[0];
     const repeats = parseInt(document.getElementById('repeats').value);
 
-    if (!youtubeUrl && !file) return alert('Please provide a YouTube link or upload an audio file.');
-    if (isNaN(repeats) || repeats < 1) return alert('Please enter a number ≥ 1.');
+    if (!file) return alert('Please select an audio file first.');
+    if (isNaN(repeats) || repeats < 1) return alert('Please enter a valid number of repeats ≥ 1.');
 
     repeatBtn.disabled = true;
     download.style.display = 'none';
@@ -67,50 +70,23 @@ async function repeatAudio() {
     progressFill.style.width = '0%';
     progressText.textContent = 'Preparing...';
 
-    let audioBlob;
-
     try {
-        if (youtubeUrl) {
-            status.textContent = 'Downloading YouTube audio...';
-            progressText.textContent = 'Fetching from YouTube...';
-
-            // Extract video ID from URL
-            const videoId = youtubeUrl.match(/(?:v=|\/)([0-9A-Za-z_-]{11}.*)/)?.[1];
-            if (!videoId) throw new Error('Invalid YouTube URL');
-
-            // Call RapidAPI Youtube to MP3
-            const response = await fetch(`https://youtube-to-mp3-download.p.rapidapi.com/?id=${videoId}`, {
-                method: 'GET',
-                headers: {
-                    'X-RapidAPI-Key': RAPID_API_KEY,
-                    'X-RapidAPI-Host': 'youtube-to-mp3-download.p.rapidapi.com'
-                }
-            });
-
-            const data = await response.json();
-            if (!data.link) throw new Error('No download link from API');
-
-            // Fetch the MP3 blob
-            const mp3Response = await fetch(data.link);
-            audioBlob = await mp3Response.blob();
-        } else {
-            audioBlob = file;
-        }
-
         status.textContent = 'Decoding audio...';
-        progressText.textContent = 'Decoding file...';
+        progressText.textContent = 'Loading file...';
 
-        const arrayBuffer = await audioBlob.arrayBuffer();
+        const arrayBuffer = await file.arrayBuffer();
         const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
         const originalBuffer = await tempCtx.decodeAudioData(arrayBuffer);
 
-        status.textContent = 'Preparing repeat...';
-        progressText.textContent = 'Preparing buffer...';
+        status.textContent = 'Processing (repeat + speed)...';
+        progressText.textContent = 'Applying speed & repeats...';
 
+        const totalDuration = originalBuffer.duration * repeats;
         const totalSamples = originalBuffer.length * repeats;
+
         if (totalSamples > 100_000_000) {
-            const approxMin = Math.round(totalSamples / originalBuffer.sampleRate / 60);
-            if (!confirm(`Large file (~${approxMin} min). May take time or crash tab. Continue?`)) {
+            const approxMin = Math.round(totalDuration / 60);
+            if (!confirm(`Large result (~${approxMin} min). May take time or crash. Continue?`)) {
                 resetUI();
                 return;
             }
@@ -118,21 +94,20 @@ async function repeatAudio() {
 
         const offlineCtx = new OfflineAudioContext(
             originalBuffer.numberOfChannels,
-            totalSamples,
+            originalBuffer.length * repeats,
             originalBuffer.sampleRate
         );
 
         const source = offlineCtx.createBufferSource();
         source.buffer = originalBuffer;
+        source.playbackRate.value = selectedSpeed;   // ← speed applied here
         source.loop = true;
         source.connect(offlineCtx.destination);
 
         source.start(0);
-        source.stop(originalBuffer.duration * repeats);
+        source.stop(totalDuration / selectedSpeed);  // adjust stop time for speed
 
-        status.textContent = 'Rendering repeated audio...';
-        progressText.textContent = 'Rendering (this may take a while)...';
-
+        // Progress simulation
         let progress = 5;
         progressFill.style.width = progress + '%';
         const interval = setInterval(() => {
@@ -147,9 +122,9 @@ async function repeatAudio() {
 
         clearInterval(interval);
         progressFill.style.width = '100%';
-        progressText.textContent = 'Finalizing file...';
+        progressText.textContent = 'Creating file...';
 
-        status.textContent = 'Converting to WAV...';
+        status.textContent = 'Finalizing...';
         const wavBlob = audioBufferToWav(renderedBuffer);
         const url = URL.createObjectURL(wavBlob);
 
@@ -157,24 +132,22 @@ async function repeatAudio() {
         previewSec.style.display = 'block';
 
         download.href = url;
-        download.download = 'repeated_audio.wav';
+        download.download = `repeated_${selectedSpeed}x_${repeats}times.wav`;
         download.style.display = 'block';
 
-        status.textContent = 'Done! Preview or download below ↓';
+        status.textContent = `Done! (${selectedSpeed}× speed, ${repeats}× repeat)`;
         status.className = 'success';
-        progressText.textContent = 'Complete!';
+        progressText.textContent = 'Ready to download';
 
     } catch (err) {
-        console.error('Processing failed:', err);
-        status.textContent = 'Error: ' + (err.message || 'Failed to process audio');
+        console.error(err);
+        status.textContent = 'Error: ' + (err.message || 'Processing failed');
         status.className = 'error';
-        progressText.textContent = 'Failed – see console (F12) for details';
-        alert('Error: ' + (err.message || 'Could not process. Check API key, URL, or try a different file.'));
+        progressText.textContent = 'Failed – check console (F12)';
+        alert('Error: ' + (err.message || 'Could not process audio. Try smaller file/repeats.'));
     } finally {
         repeatBtn.disabled = false;
-        setTimeout(() => {
-            progressContainer.style.display = 'none';
-        }, 1800);
+        setTimeout(() => progressContainer.style.display = 'none', 2000);
     }
 }
 
