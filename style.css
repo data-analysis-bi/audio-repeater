@@ -194,7 +194,6 @@ footer {
     background: linear-gradient(90deg, var(--primary), var(--primary-dark));
     transition: width 0.5s ease;
 }
-
 @media (max-width: 500px) {
     .tool-card { padding: 32px 24px; }
     .drop-area { padding: 40px 16px; }
