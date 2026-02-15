@@ -1,63 +1,73 @@
-// Drag-and-drop setup
-const dropArea = document.getElementById('dropArea');
-const fileInput = document.getElementById('audioFile');
-const fileNameEl = document.getElementById('fileName');
-const status = document.getElementById('status');
-const downloadLink = document.getElementById('download');
-const previewSection = document.getElementById('previewSection');
-const audioPreview = document.getElementById('audioPreview');
-const repeatButton = document.getElementById('repeatButton');
+const dropArea    = document.getElementById('dropArea');
+const fileInput   = document.getElementById('audioFile');
+const fileNameEl  = document.getElementById('fileName');
+const status      = document.getElementById('status');
+const download    = document.getElementById('download');
+const previewSec  = document.getElementById('previewSection');
+const audioPrev   = document.getElementById('audioPreview');
+const repeatBtn   = document.getElementById('repeatButton');
 
+// Click opens file picker
 dropArea.addEventListener('click', () => fileInput.click());
 
+// Show file name when selected via click
 fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
-    if (file) fileNameEl.textContent = file.name;
+    fileNameEl.textContent = file ? file.name : '';
 });
 
+// Prevent default drag behaviors
 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-    dropArea.addEventListener(eventName, preventDefaults, false);
+    dropArea.addEventListener(eventName, e => {
+        e.preventDefault();
+        e.stopPropagation();
+    }, false);
 });
 
-function preventDefaults(e) {
-    e.preventDefault();
-    e.stopPropagation();
-}
-
+// Highlight on drag over/enter
 ['dragenter', 'dragover'].forEach(eventName => {
-    dropArea.addEventListener(eventName, () => dropArea.classList.add('dragover'), false);
+    dropArea.addEventListener(eventName, () => {
+        dropArea.classList.add('dragover');
+    }, false);
 });
 
+// Remove highlight
 ['dragleave', 'drop'].forEach(eventName => {
-    dropArea.addEventListener(eventName, () => dropArea.classList.remove('dragover'), false);
+    dropArea.addEventListener(eventName, () => {
+        dropArea.classList.remove('dragover');
+    }, false);
 });
 
+// Handle dropped file
 dropArea.addEventListener('drop', (e) => {
-    const file = e.dataTransfer.files[0];
+    const dt = e.dataTransfer;
+    const file = dt.files[0];
     if (file && file.type.startsWith('audio/')) {
-        fileInput.files = e.dataTransfer.files;
+        fileInput.files = dt.files;  // Assign to input for consistency
         fileNameEl.textContent = file.name;
     } else {
-        alert('Please drop an audio file.');
+        alert('Please drop an audio file (MP3, WAV, etc.).');
     }
 });
+
+repeatBtn.addEventListener('click', repeatAudio);
 
 async function repeatAudio() {
     const file = fileInput.files[0];
     const repeats = parseInt(document.getElementById('repeats').value);
 
-    if (!file) return alert('Please select an audio file.');
-    if (isNaN(repeats) || repeats < 1) return alert('Enter a valid number ≥ 1.');
+    if (!file) return alert('Please select an audio file first.');
+    if (isNaN(repeats) || repeats < 1) return alert('Please enter a number ≥ 1.');
 
-    repeatButton.disabled = true;
-    downloadLink.style.display = 'none';
-    previewSection.style.display = 'none';
+    repeatBtn.disabled = true;
+    download.style.display = 'none';
+    previewSec.style.display = 'none';
     status.textContent = 'Starting...';
     status.className = 'processing';
 
     try {
         status.textContent = 'Decoding audio... (1/3)';
-        
+
         const arrayBuffer = await file.arrayBuffer();
         const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
         const originalBuffer = await tempCtx.decodeAudioData(arrayBuffer);
@@ -67,9 +77,8 @@ async function repeatAudio() {
         const totalSamples = originalBuffer.length * repeats;
         if (totalSamples > 100_000_000) {
             const approxMin = Math.round(totalSamples / originalBuffer.sampleRate / 60);
-            if (!confirm(`Large file (~${approxMin} min). May take time or crash tab. Continue?`)) {
+            if (!confirm(`Large output (~${approxMin} min). May take time or crash tab. Continue?`)) {
                 status.textContent = 'Cancelled';
-                repeatButton.disabled = false;
                 return;
             }
         }
@@ -89,32 +98,31 @@ async function repeatAudio() {
         source.stop(originalBuffer.duration * repeats);
 
         status.textContent = 'Rendering... (3/3) — please wait';
-        
+
         const renderedBuffer = await offlineCtx.startRendering();
 
         status.textContent = 'Finalizing file...';
-        
+
         const wavBlob = audioBufferToWav(renderedBuffer);
-
         const url = URL.createObjectURL(wavBlob);
-        downloadLink.href = url;
-        downloadLink.download = 'repeated_audio.wav';
-        downloadLink.style.display = 'block';
 
-        // Enable preview
-        audioPreview.src = url;
-        previewSection.style.display = 'block';
+        audioPrev.src = url;
+        previewSec.style.display = 'block';
 
-        status.textContent = 'Ready! Preview or download below ↓';
+        download.href = url;
+        download.download = 'repeated_audio.wav';
+        download.style.display = 'block';
+
+        status.textContent = 'Done! Preview or download below ↓';
         status.className = 'success';
 
-    } catch (error) {
-        console.error(error);
-        status.textContent = 'Error: ' + (error.message || 'Processing failed');
+    } catch (err) {
+        console.error(err);
+        status.textContent = 'Error: ' + (err.message || 'Failed to process');
         status.className = 'error';
-        alert('Error: ' + (error.message || 'Try another file or fewer repeats.'));
+        alert('Error: ' + (err.message || 'Try a different file or fewer repeats.'));
     } finally {
-        repeatButton.disabled = false;
+        repeatBtn.disabled = false;
     }
 }
 
