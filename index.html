@@ -42,14 +42,14 @@
                 <div class="form-group">
                     <label>Playback Speed</label>
                     <div class="speed-buttons">
-                        <label><input type="radio" name="speed" value="1" checked> 1× (normal)</label>
+                        <label><input type="radio" name="speed" value="1" checked> 1× </label>
                         <label><input type="radio" name="speed" value="1.5"> 1.5×</label>
                         <label><input type="radio" name="speed" value="2"> 2×</label>
                         <label><input type="radio" name="speed" value="3"> 3×</label>
                     </div>
                 </div>
 
-                <button id="repeatButton">Process Audio</button>
+                <button id="processButton">Process Audio</button>
 
                 <div id="status"></div>
 
@@ -63,6 +63,7 @@
                 <div id="previewSection" style="display: none; margin: 32px 0; text-align: center;">
                     <h3>Preview Result</h3>
                     <audio id="audioPreview" controls style="width: 100%; max-width: 500px;"></audio>
+                    <p id="durationInfo" style="margin-top: 8px; color: var(--gray);"></p>
                 </div>
 
                 <a id="download" style="display: none;">Download Processed Audio (WAV)</a>
