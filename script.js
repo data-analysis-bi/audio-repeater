@@ -6,47 +6,42 @@ const download    = document.getElementById('download');
 const previewSec  = document.getElementById('previewSection');
 const audioPrev   = document.getElementById('audioPreview');
 const repeatBtn   = document.getElementById('repeatButton');
+const progressContainer = document.getElementById('progressContainer');
+const progressFill = document.getElementById('progressFill');
+const progressText = document.getElementById('progressText');
 
-// Click opens file picker
+// Click to open file dialog
 dropArea.addEventListener('click', () => fileInput.click());
 
-// Show file name when selected via click
+// Show selected file name
 fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     fileNameEl.textContent = file ? file.name : '';
 });
 
-// Prevent default drag behaviors
-['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-    dropArea.addEventListener(eventName, e => {
+// Drag & drop handlers
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+    dropArea.addEventListener(evt, e => {
         e.preventDefault();
         e.stopPropagation();
     }, false);
 });
 
-// Highlight on drag over/enter
-['dragenter', 'dragover'].forEach(eventName => {
-    dropArea.addEventListener(eventName, () => {
-        dropArea.classList.add('dragover');
-    }, false);
+['dragenter', 'dragover'].forEach(evt => {
+    dropArea.addEventListener(evt, () => dropArea.classList.add('dragover'), false);
 });
 
-// Remove highlight
-['dragleave', 'drop'].forEach(eventName => {
-    dropArea.addEventListener(eventName, () => {
-        dropArea.classList.remove('dragover');
-    }, false);
+['dragleave', 'drop'].forEach(evt => {
+    dropArea.addEventListener(evt, () => dropArea.classList.remove('dragover'), false);
 });
 
-// Handle dropped file
 dropArea.addEventListener('drop', (e) => {
-    const dt = e.dataTransfer;
-    const file = dt.files[0];
+    const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith('audio/')) {
-        fileInput.files = dt.files;  // Assign to input for consistency
+        fileInput.files = e.dataTransfer.files;
         fileNameEl.textContent = file.name;
     } else {
-        alert('Please drop an audio file (MP3, WAV, etc.).');
+        alert('Please drop an audio file.');
     }
 });
 
@@ -65,20 +60,26 @@ async function repeatAudio() {
     status.textContent = 'Starting...';
     status.className = 'processing';
 
+    progressContainer.style.display = 'block';
+    progressFill.style.width = '0%';
+    progressText.textContent = 'Preparing...';
+
     try {
-        status.textContent = 'Decoding audio... (1/3)';
+        status.textContent = 'Decoding audio...';
+        progressText.textContent = 'Decoding file...';
 
         const arrayBuffer = await file.arrayBuffer();
         const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
         const originalBuffer = await tempCtx.decodeAudioData(arrayBuffer);
 
-        status.textContent = 'Preparing repeat... (2/3)';
+        status.textContent = 'Preparing repeat...';
+        progressText.textContent = 'Preparing buffer...';
 
         const totalSamples = originalBuffer.length * repeats;
         if (totalSamples > 100_000_000) {
             const approxMin = Math.round(totalSamples / originalBuffer.sampleRate / 60);
-            if (!confirm(`Large output (~${approxMin} min). May take time or crash tab. Continue?`)) {
-                status.textContent = 'Cancelled';
+            if (!confirm(`Large file (~${approxMin} min). May take time or crash tab. Continue?`)) {
+                resetUI();
                 return;
             }
         }
@@ -97,12 +98,27 @@ async function repeatAudio() {
         source.start(0);
         source.stop(originalBuffer.duration * repeats);
 
-        status.textContent = 'Rendering... (3/3) — please wait';
+        status.textContent = 'Rendering repeated audio...';
+        progressText.textContent = 'Rendering (this may take a while)...';
+
+        // Fake progress animation
+        let progress = 5;
+        progressFill.style.width = progress + '%';
+        const interval = setInterval(() => {
+            if (progress < 92) {
+                progress += Math.random() * 6 + 3;
+                progress = Math.min(progress, 92);
+                progressFill.style.width = progress + '%';
+            }
+        }, 600);
 
         const renderedBuffer = await offlineCtx.startRendering();
 
-        status.textContent = 'Finalizing file...';
+        clearInterval(interval);
+        progressFill.style.width = '100%';
+        progressText.textContent = 'Finalizing file...';
 
+        status.textContent = 'Converting to file...';
         const wavBlob = audioBufferToWav(renderedBuffer);
         const url = URL.createObjectURL(wavBlob);
 
@@ -115,15 +131,27 @@ async function repeatAudio() {
 
         status.textContent = 'Done! Preview or download below ↓';
         status.className = 'success';
+        progressText.textContent = 'Complete!';
 
     } catch (err) {
-        console.error(err);
-        status.textContent = 'Error: ' + (err.message || 'Failed to process');
+        console.error('Processing failed:', err);
+        status.textContent = 'Error: ' + (err.message || 'Failed to process audio');
         status.className = 'error';
-        alert('Error: ' + (err.message || 'Try a different file or fewer repeats.'));
+        progressText.textContent = 'Failed – see console (F12) for details';
+        alert('Error: ' + (err.message || 'Could not process the file. Try a shorter audio or fewer repeats.'));
     } finally {
         repeatBtn.disabled = false;
+        setTimeout(() => {
+            progressContainer.style.display = 'none';
+        }, 1800);
     }
+}
+
+function resetUI() {
+    repeatBtn.disabled = false;
+    progressContainer.style.display = 'none';
+    status.textContent = '';
+    status.className = '';
 }
 
 function audioBufferToWav(buffer) {
