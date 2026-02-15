@@ -1,6 +1,7 @@
 const dropArea    = document.getElementById('dropArea');
 const fileInput   = document.getElementById('audioFile');
 const fileNameEl  = document.getElementById('fileName');
+const youtubeUrlInput = document.getElementById('youtubeUrl');
 const status      = document.getElementById('status');
 const download    = document.getElementById('download');
 const previewSec  = document.getElementById('previewSection');
@@ -10,16 +11,17 @@ const progressContainer = document.getElementById('progressContainer');
 const progressFill = document.getElementById('progressFill');
 const progressText = document.getElementById('progressText');
 
-// Click to open file dialog
+// Replace with your RapidAPI key for Youtube to Mp3 API
+const RAPID_API_KEY = 'YOUR_RAPIDAPI_KEY_HERE'; // Sign up at https://rapidapi.com/CoolGuruji/api/youtube-to-mp3-download and get a free key
+
+// Drag & drop for file
 dropArea.addEventListener('click', () => fileInput.click());
 
-// Show selected file name
 fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     fileNameEl.textContent = file ? file.name : '';
 });
 
-// Drag & drop handlers
 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
     dropArea.addEventListener(evt, e => {
         e.preventDefault();
@@ -48,10 +50,11 @@ dropArea.addEventListener('drop', (e) => {
 repeatBtn.addEventListener('click', repeatAudio);
 
 async function repeatAudio() {
+    const youtubeUrl = youtubeUrlInput.value.trim();
     const file = fileInput.files[0];
     const repeats = parseInt(document.getElementById('repeats').value);
 
-    if (!file) return alert('Please select an audio file first.');
+    if (!youtubeUrl && !file) return alert('Please provide a YouTube link or upload an audio file.');
     if (isNaN(repeats) || repeats < 1) return alert('Please enter a number ≥ 1.');
 
     repeatBtn.disabled = true;
@@ -64,11 +67,40 @@ async function repeatAudio() {
     progressFill.style.width = '0%';
     progressText.textContent = 'Preparing...';
 
+    let audioBlob;
+
     try {
+        if (youtubeUrl) {
+            status.textContent = 'Downloading YouTube audio...';
+            progressText.textContent = 'Fetching from YouTube...';
+
+            // Extract video ID from URL
+            const videoId = youtubeUrl.match(/(?:v=|\/)([0-9A-Za-z_-]{11}.*)/)?.[1];
+            if (!videoId) throw new Error('Invalid YouTube URL');
+
+            // Call RapidAPI Youtube to MP3
+            const response = await fetch(`https://youtube-to-mp3-download.p.rapidapi.com/?id=${videoId}`, {
+                method: 'GET',
+                headers: {
+                    'X-RapidAPI-Key': RAPID_API_KEY,
+                    'X-RapidAPI-Host': 'youtube-to-mp3-download.p.rapidapi.com'
+                }
+            });
+
+            const data = await response.json();
+            if (!data.link) throw new Error('No download link from API');
+
+            // Fetch the MP3 blob
+            const mp3Response = await fetch(data.link);
+            audioBlob = await mp3Response.blob();
+        } else {
+            audioBlob = file;
+        }
+
         status.textContent = 'Decoding audio...';
         progressText.textContent = 'Decoding file...';
 
-        const arrayBuffer = await file.arrayBuffer();
+        const arrayBuffer = await audioBlob.arrayBuffer();
         const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
         const originalBuffer = await tempCtx.decodeAudioData(arrayBuffer);
 
@@ -101,7 +133,6 @@ async function repeatAudio() {
         status.textContent = 'Rendering repeated audio...';
         progressText.textContent = 'Rendering (this may take a while)...';
 
-        // Fake progress animation
         let progress = 5;
         progressFill.style.width = progress + '%';
         const interval = setInterval(() => {
@@ -118,7 +149,7 @@ async function repeatAudio() {
         progressFill.style.width = '100%';
         progressText.textContent = 'Finalizing file...';
 
-        status.textContent = 'Converting to file...';
+        status.textContent = 'Converting to WAV...';
         const wavBlob = audioBufferToWav(renderedBuffer);
         const url = URL.createObjectURL(wavBlob);
 
@@ -138,7 +169,7 @@ async function repeatAudio() {
         status.textContent = 'Error: ' + (err.message || 'Failed to process audio');
         status.className = 'error';
         progressText.textContent = 'Failed – see console (F12) for details';
-        alert('Error: ' + (err.message || 'Could not process the file. Try a shorter audio or fewer repeats.'));
+        alert('Error: ' + (err.message || 'Could not process. Check API key, URL, or try a different file.'));
     } finally {
         repeatBtn.disabled = false;
         setTimeout(() => {
