@@ -1,5 +1,3 @@
-console.log("script.js loaded");
-
 const dropArea    = document.getElementById('dropArea');
 const fileInput   = document.getElementById('audioFile');
 const fileNameEl  = document.getElementById('fileName');
@@ -15,57 +13,46 @@ const progressText = document.getElementById('progressText');
 
 let selectedSpeed = 1;
 
-// Safety check
-if (!processBtn) console.error("processButton not found in HTML");
-if (!progressContainer) console.error("progressContainer not found");
-
 // Drag & drop
-if (dropArea) {
-    dropArea.addEventListener('click', () => fileInput.click());
+dropArea.addEventListener('click', () => fileInput.click());
 
-    fileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        fileNameEl.textContent = file ? file.name : '';
-    });
+fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    fileNameEl.textContent = file ? file.name : '';
+});
 
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
-        dropArea.addEventListener(evt, e => {
-            e.preventDefault();
-            e.stopPropagation();
-        }, false);
-    });
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+    dropArea.addEventListener(evt, e => {
+        e.preventDefault();
+        e.stopPropagation();
+    }, false);
+});
 
-    ['dragenter', 'dragover'].forEach(evt => {
-        dropArea.addEventListener(evt, () => dropArea.classList.add('dragover'), false);
-    });
+['dragenter', 'dragover'].forEach(evt => {
+    dropArea.addEventListener(evt, () => dropArea.classList.add('dragover'), false);
+});
 
-    ['dragleave', 'drop'].forEach(evt => {
-        dropArea.addEventListener(evt, () => dropArea.classList.remove('dragover'), false);
-    });
+['dragleave', 'drop'].forEach(evt => {
+    dropArea.addEventListener(evt, () => dropArea.classList.remove('dragover'), false);
+});
 
-    dropArea.addEventListener('drop', (e) => {
-        const file = e.dataTransfer.files[0];
-        if (file && file.type.startsWith('audio/')) {
-            fileInput.files = e.dataTransfer.files;
-            fileNameEl.textContent = file.name;
-        } else {
-            alert('Please drop an audio file.');
-        }
-    });
-}
+dropArea.addEventListener('drop', (e) => {
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('audio/')) {
+        fileInput.files = e.dataTransfer.files;
+        fileNameEl.textContent = file.name;
+    } else {
+        alert('Please drop an audio file.');
+    }
+});
 
 // Speed selection
 document.querySelectorAll('input[name="speed"]').forEach(radio => {
-    radio.addEventListener('change', e => {
-        selectedSpeed = parseFloat(e.target.value);
-        console.log("Speed set to:", selectedSpeed);
-    });
+    radio.addEventListener('change', e => selectedSpeed = parseFloat(e.target.value));
 });
 
 // Process button
-if (processBtn) {
-    processBtn.addEventListener('click', processAudio);
-}
+processBtn.addEventListener('click', processAudio);
 
 async function processAudio() {
     const file = fileInput.files[0];
@@ -92,25 +79,39 @@ async function processAudio() {
 
         let workingBuffer = originalBuffer;
 
-        // Speed change
+        // Pitch-preserving time stretch using SoundTouch.js
         if (selectedSpeed !== 1) {
-            status.textContent = `Speed → ${selectedSpeed}× ...`;
-            progressText.textContent = 'Time stretching...';
+            status.textContent = `Stretching to ${selectedSpeed}× speed...`;
+            progressText.textContent = 'Preserving pitch...';
 
+            const channels = originalBuffer.numberOfChannels;
+            const sampleRate = originalBuffer.sampleRate;
             const newLength = Math.floor(originalBuffer.length / selectedSpeed);
-            const speedCtx = new OfflineAudioContext(
-                originalBuffer.numberOfChannels,
-                newLength,
-                originalBuffer.sampleRate
-            );
 
-            const src = speedCtx.createBufferSource();
-            src.buffer = originalBuffer;
-            src.playbackRate.value = selectedSpeed;
-            src.connect(speedCtx.destination);
-            src.start(0);
+            const newBuffer = audioCtx.createBuffer(channels, newLength, sampleRate);
 
-            workingBuffer = await speedCtx.startRendering();
+            for (let ch = 0; ch < channels; ch++) {
+                const inputSamples = originalBuffer.getChannelData(ch);
+
+                const st = new SoundTouch(sampleRate);
+                st.tempo = selectedSpeed;
+
+                const source = new Float32ArraySource(inputSamples);
+                const filter = new SimpleFilter(source, st);
+
+                const outputSamples = new Float32Array(newLength);
+                let samplesExtracted = 0;
+                let samplesRead = 0;
+
+                while (samplesExtracted < newLength) {
+                    samplesRead = filter.extract(outputSamples.subarray(samplesExtracted), Math.min(1024, newLength - samplesExtracted));
+                    samplesExtracted += samplesRead;
+                }
+
+                newBuffer.copyToChannel(outputSamples, ch);
+            }
+
+            workingBuffer = newBuffer;
         }
 
         // Repeat
