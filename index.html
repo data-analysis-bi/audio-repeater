@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audio Repeater - Repeat Audio Files Online</title>
-    <meta name="description" content="Upload your audio file or YouTube link, set the number of repeats, and download one combined file. Free and simple.">
+    <title>Audio Repeater - Repeat & Speed Control</title>
+    <meta name="description" content="Upload audio, choose repeats and speed, download one combined file.">
     <meta name="theme-color" content="#4f46e5">
     <link rel="manifest" href="manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,22 +16,17 @@
     <header>
         <div class="container">
             <h1 class="logo">Audio Repeater</h1>
-            <p class="tagline">Repeat your audio files or YouTube videos easily — online & free</p>
+            <p class="tagline">Repeat your audio — with optional speed change — online & free</p>
         </div>
     </header>
 
     <main>
         <div class="container">
             <div class="tool-card">
-                <p class="subtitle">Upload an audio file or paste a YouTube link, choose how many times to repeat it, and download one combined file.</p>
+                <p class="subtitle">Upload audio, choose repeat count and speed, download one combined file.</p>
 
                 <div class="form-group">
-                    <label for="youtubeUrl">YouTube Video Link (optional)</label>
-                    <input type="text" id="youtubeUrl" placeholder="e.g. https://www.youtube.com/watch?v=VIDEO_ID">
-                </div>
-
-                <div class="form-group">
-                    <label>Select or Drop Audio File (if not using YouTube)</label>
+                    <label>Select or Drop Audio File</label>
                     <div id="dropArea" class="drop-area">
                         <p>Drag & drop your file here or click to browse</p>
                         <input type="file" id="audioFile" accept="audio/*">
@@ -40,11 +35,21 @@
                 </div>
 
                 <div class="form-group">
+                    <label>Playback Speed</label>
+                    <div class="speed-buttons">
+                        <button type="button" class="speed-btn active" data-speed="1">1×</button>
+                        <button type="button" class="speed-btn" data-speed="1.5">1.5×</button>
+                        <button type="button" class="speed-btn" data-speed="2">2×</button>
+                        <button type="button" class="speed-btn" data-speed="3">3×</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
                     <label for="repeats">Number of Repeats</label>
                     <input type="number" id="repeats" min="1" placeholder="e.g. 5, 10, 20" required>
                 </div>
 
-                <button id="repeatButton">Repeat Audio</button>
+                <button id="repeatButton">Process & Download</button>
 
                 <div id="status"></div>
 
@@ -56,13 +61,11 @@
                 </div>
 
                 <div id="previewSection" style="display: none; margin: 32px 0; text-align: center;">
-                    <h3>Preview Repeated Audio</h3>
+                    <h3>Preview Result</h3>
                     <audio id="audioPreview" controls style="width: 100%; max-width: 500px;"></audio>
                 </div>
 
-                <a id="download" style="display: none;">Download Repeated Audio (WAV)</a>
-
-                <p class="note" style="margin-top: 32px; color: var(--gray); font-size: 0.9rem; text-align: center;">Note: For YouTube links, we use a free API (sign up at RapidAPI for a key if needed). Inspired by Y2mate for simple link input and audio download.</p>
+                <a id="download" style="display: none;">Download Processed Audio (WAV)</a>
             </div>
         </div>
     </main>
