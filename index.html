@@ -20,6 +20,7 @@
     <input type="file" id="audioFile" accept="audio/*">
     <input type="number" id="repeats" min="1" placeholder="Number of repeats (e.g., 5)">
     <button onclick="repeatAudio()">Repeat Audio</button>
+    <div id="status" style="color: #666; min-height: 1.5em;"></div>
     <a id="download">Download Repeated Audio</a>
 
     <script>
@@ -30,6 +31,7 @@
 
             const file = fileInput.files[0];
             const repeats = parseInt(repeatsInput.value);
+            document.getElementById('status')?.innerText = 'Processing... please wait';
 
             if (!file || isNaN(repeats) || repeats < 1) {
                 alert('Please upload an audio file and enter a valid number of repeats (at least 1).');
@@ -37,39 +39,45 @@
             }
 
             try {
-                const arrayBuffer = await file.arrayBuffer();
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const originalBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    const arrayBuffer = await file.arrayBuffer();
 
-                // Create a new buffer with repeated length
-                const newBuffer = audioCtx.createBuffer(
-                    originalBuffer.numberOfChannels,
-                    originalBuffer.length * repeats,
-                    originalBuffer.sampleRate
-                );
+    // We need a temporary AudioContext just to decode
+    const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const originalBuffer = await tempCtx.decodeAudioData(arrayBuffer);
 
-                // Copy the original buffer's data repeatedly into the new buffer
-                for (let i = 0; i < repeats; i++) {
-                    for (let channel = 0; channel < newBuffer.numberOfChannels; channel++) {
-                        const originalChannelData = originalBuffer.getChannelData(channel);
-                        newBuffer.copyToChannel(originalChannelData, channel, i * originalBuffer.length);
-                    }
-                }
+    // Now create OfflineAudioContext with the final size
+    const offlineCtx = new OfflineAudioContext(
+        originalBuffer.numberOfChannels,
+        originalBuffer.length * repeats,
+        originalBuffer.sampleRate
+    );
 
-                // Convert the new buffer to a WAV Blob
-                const wavBlob = audioBufferToWav(newBuffer);
+    const source = offlineCtx.createBufferSource();
+    source.buffer = originalBuffer;
+    source.loop = true;
+    source.connect(offlineCtx.destination);
 
-                // Create download link
-                const url = URL.createObjectURL(wavBlob);
-                downloadLink.href = url;
-                downloadLink.download = 'repeated_audio.wav';
-                downloadLink.style.display = 'block';
-                downloadLink.textContent = 'Download Repeated Audio (WAV)';
-            } catch (error) {
-                console.error(error);
-                alert('An error occurred while processing the audio. Please try a different file or check console for details.');
-            }
-        }
+    // Play exactly the number of loops we want
+    source.start(0);
+    source.stop(originalBuffer.duration * repeats);
+
+    // This renders very quickly (native speed)
+    const renderedBuffer = await offlineCtx.startRendering();
+    document.getElementById('status')?.innerText = 'Done! Ready to download ↓';
+
+    // Convert to downloadable WAV
+    const wavBlob = audioBufferToWav(renderedBuffer);
+
+    const url = URL.createObjectURL(wavBlob);
+    downloadLink.href = url;
+    downloadLink.download = 'repeated_audio.wav';
+    downloadLink.style.display = 'block';
+    downloadLink.textContent = 'Download Repeated Audio (WAV)';
+
+} catch (error) {
+    console.error(error);
+    alert('Error: ' + (error.message || 'Could not process the audio file. Try another file or smaller repeat count.'));
+}
 
         // Function to convert AudioBuffer to WAV Blob
         function audioBufferToWav(buffer) {
