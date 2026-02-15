@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Repeater App</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; }
+        input, button { margin: 10px 0; display: block; }
+        #download { display: none; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Audio Repeater</h1>
+    <p>Upload an audio file, enter the number of times to repeat it, and click "Repeat" to generate a single repeated audio file for download.</p>
+    
+    <input type="file" id="audioFile" accept="audio/*">
+    <input type="number" id="repeats" min="1" placeholder="Number of repeats (e.g., 5)">
+    <button onclick="repeatAudio()">Repeat Audio</button>
+    <a id="download">Download Repeated Audio</a>
+
+    <script>
+        async function repeatAudio() {
+            const fileInput = document.getElementById('audioFile');
+            const repeatsInput = document.getElementById('repeats');
+            const downloadLink = document.getElementById('download');
+
+            const file = fileInput.files[0];
+            const repeats = parseInt(repeatsInput.value);
+
+            if (!file || isNaN(repeats) || repeats < 1) {
+                alert('Please upload an audio file and enter a valid number of repeats (at least 1).');
+                return;
+            }
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const originalBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+                // Create a new buffer with repeated length
+                const newBuffer = audioCtx.createBuffer(
+                    originalBuffer.numberOfChannels,
+                    originalBuffer.length * repeats,
+                    originalBuffer.sampleRate
+                );
+
+                // Copy the original buffer's data repeatedly into the new buffer
+                for (let i = 0; i < repeats; i++) {
+                    for (let channel = 0; channel < newBuffer.numberOfChannels; channel++) {
+                        const originalChannelData = originalBuffer.getChannelData(channel);
+                        newBuffer.copyToChannel(originalChannelData, channel, i * originalBuffer.length);
+                    }
+                }
+
+                // Convert the new buffer to a WAV Blob
+                const wavBlob = audioBufferToWav(newBuffer);
+
+                // Create download link
+                const url = URL.createObjectURL(wavBlob);
+                downloadLink.href = url;
+                downloadLink.download = 'repeated_audio.wav';
+                downloadLink.style.display = 'block';
+                downloadLink.textContent = 'Download Repeated Audio (WAV)';
+            } catch (error) {
+                console.error(error);
+                alert('An error occurred while processing the audio. Please try a different file or check console for details.');
+            }
+        }
+
+        // Function to convert AudioBuffer to WAV Blob
+        function audioBufferToWav(buffer) {
+            const numOfChan = buffer.numberOfChannels;
+            const length = buffer.length * numOfChan * 2 + 44; // 2 bytes per sample (16-bit)
+            const wavBuffer = new ArrayBuffer(length);
+            const view = new DataView(wavBuffer);
+
+            // Write WAV header
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + buffer.length * numOfChan * 2, true); // ChunkSize
+            writeString(view, 8, 'WAVE');
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true); // Subchunk1Size (PCM)
+            view.setUint16(20, 1, true); // AudioFormat (PCM)
+            view.setUint16(22, numOfChan, true); // NumChannels
+            view.setUint32(24, buffer.sampleRate, true); // SampleRate
+            view.setUint32(28, buffer.sampleRate * numOfChan * 2, true); // ByteRate
+            view.setUint16(32, numOfChan * 2, true); // BlockAlign
+            view.setUint16(34, 16, true); // BitsPerSample
+            writeString(view, 36, 'data');
+            view.setUint32(40, buffer.length * numOfChan * 2, true); // Subchunk2Size
+
+            // Write interleaved data (16-bit signed integers)
+            let offset = 44;
+            for (let i = 0; i < buffer.length; i++) {
+                for (let channel = 0; channel < numOfChan; channel++) {
+                    const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i]));
+                    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+                    offset += 2;
+                }
+            }
+
+            return new Blob([wavBuffer], { type: 'audio/wav' });
+        }
+
+        // Helper to write string to DataView
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+    </script>
+</body>
+</html>
