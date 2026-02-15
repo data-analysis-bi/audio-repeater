@@ -1,26 +1,64 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#ffffff">
-<link rel="manifest" href="manifest.json">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audio Repeater App</title>
+    <meta name="theme-color" content="#ffffff">
+    <link rel="manifest" href="manifest.json">
     <style>
-        body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; }
-        input, button { margin: 10px 0; display: block; }
-        #download { display: none; margin-top: 20px; }
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            max-width: 640px;
+            margin: 20px auto;
+            padding: 20px;
+            line-height: 1.5;
+        }
+        h1 { text-align: center; }
+        input, button {
+            width: 100%;
+            padding: 12px;
+            margin: 12px 0;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        button:hover { background: #0055aa; }
+        #download {
+            display: none;
+            margin-top: 20px;
+            text-align: center;
+            font-size: 18px;
+            padding: 12px;
+            background: #28a745;
+            color: white;
+            border-radius: 6px;
+            text-decoration: none;
+        }
+        #status {
+            margin: 20px 0;
+            font-weight: bold;
+            color: #0066cc;
+            min-height: 1.5em;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
     <h1>Audio Repeater</h1>
-    <p>Upload an audio file, enter the number of times to repeat it, and click "Repeat" to generate a single repeated audio file for download.</p>
-    
+    <p>Upload any audio file, choose how many times to repeat it, and get one combined file to download.</p>
+
     <input type="file" id="audioFile" accept="audio/*">
-    <input type="number" id="repeats" min="1" placeholder="Number of repeats (e.g., 5)">
+    <input type="number" id="repeats" min="1" placeholder="Number of repeats (e.g. 5, 10, 20)" required>
     <button onclick="repeatAudio()">Repeat Audio</button>
-    <div id="status" style="color: #666; min-height: 1.5em;"></div>
+
+    <div id="status"></div>
     <a id="download">Download Repeated Audio</a>
 
     <script>
@@ -28,83 +66,108 @@
             const fileInput = document.getElementById('audioFile');
             const repeatsInput = document.getElementById('repeats');
             const downloadLink = document.getElementById('download');
+            const status = document.getElementById('status');
 
             const file = fileInput.files[0];
             const repeats = parseInt(repeatsInput.value);
-            document.getElementById('status')?.innerText = 'Processing... please wait';
 
-            if (!file || isNaN(repeats) || repeats < 1) {
-                alert('Please upload an audio file and enter a valid number of repeats (at least 1).');
+            if (!file) {
+                alert('Please select an audio file first.');
+                return;
+            }
+            if (isNaN(repeats) || repeats < 1) {
+                alert('Please enter a valid number of repeats (at least 1).');
                 return;
             }
 
+            // Reset UI
+            downloadLink.style.display = 'none';
+            status.innerText = 'Starting...';
+
             try {
-    const arrayBuffer = await file.arrayBuffer();
+                status.innerText = 'Decoding audio... (step 1/3)';
 
-    // We need a temporary AudioContext just to decode
-    const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const originalBuffer = await tempCtx.decodeAudioData(arrayBuffer);
+                const arrayBuffer = await file.arrayBuffer();
+                const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const originalBuffer = await tempCtx.decodeAudioData(arrayBuffer);
 
-    // Now create OfflineAudioContext with the final size
-    const offlineCtx = new OfflineAudioContext(
-        originalBuffer.numberOfChannels,
-        originalBuffer.length * repeats,
-        originalBuffer.sampleRate
-    );
+                status.innerText = 'Preparing repeat... (step 2/3)';
 
-    const source = offlineCtx.createBufferSource();
-    source.buffer = originalBuffer;
-    source.loop = true;
-    source.connect(offlineCtx.destination);
+                const totalSamples = originalBuffer.length * repeats;
 
-    // Play exactly the number of loops we want
-    source.start(0);
-    source.stop(originalBuffer.duration * repeats);
+                // Warn about extremely large files
+                if (totalSamples > 100_000_000) {
+                    const approxMinutes = Math.round(totalSamples / originalBuffer.sampleRate / 60);
+                    if (!confirm(`This will create a very large file (~${approxMinutes} minutes). It may take time or crash the browser tab. Continue?`)) {
+                        status.innerText = 'Cancelled';
+                        return;
+                    }
+                }
 
-    // This renders very quickly (native speed)
-    const renderedBuffer = await offlineCtx.startRendering();
-    document.getElementById('status')?.innerText = 'Done! Ready to download ↓';
+                const offlineCtx = new OfflineAudioContext(
+                    originalBuffer.numberOfChannels,
+                    totalSamples,
+                    originalBuffer.sampleRate
+                );
 
-    // Convert to downloadable WAV
-    const wavBlob = audioBufferToWav(renderedBuffer);
+                const source = offlineCtx.createBufferSource();
+                source.buffer = originalBuffer;
+                source.loop = true;
+                source.connect(offlineCtx.destination);
 
-    const url = URL.createObjectURL(wavBlob);
-    downloadLink.href = url;
-    downloadLink.download = 'repeated_audio.wav';
-    downloadLink.style.display = 'block';
-    downloadLink.textContent = 'Download Repeated Audio (WAV)';
+                source.start(0);
+                source.stop(originalBuffer.duration * repeats);
 
-} catch (error) {
-    console.error(error);
-    alert('Error: ' + (error.message || 'Could not process the audio file. Try another file or smaller repeat count.'));
-}
+                status.innerText = 'Rendering repeated audio... (step 3/3) — this may take a few seconds';
 
-        // Function to convert AudioBuffer to WAV Blob
+                const renderedBuffer = await offlineCtx.startRendering();
+
+                status.innerText = 'Converting to WAV file... almost done!';
+
+                const wavBlob = audioBufferToWav(renderedBuffer);
+
+                const url = URL.createObjectURL(wavBlob);
+                downloadLink.href = url;
+                downloadLink.download = 'repeated_audio.wav';
+                downloadLink.style.display = 'block';
+                downloadLink.textContent = 'Download Repeated Audio (WAV)';
+
+                status.innerText = 'Done! Click the download link above ↓';
+
+            } catch (error) {
+                console.error(error);
+                status.innerText = 'Error: ' + (error.message || 'Failed to process audio');
+                alert('Error: ' + (error.message || 'Could not process the audio. Try a different file or fewer repeats.'));
+            }
+        }
+
+        // ────────────────────────────────────────────────
+        // Convert AudioBuffer → WAV Blob (16-bit PCM)
+        // ────────────────────────────────────────────────
         function audioBufferToWav(buffer) {
-            const numOfChan = buffer.numberOfChannels;
-            const length = buffer.length * numOfChan * 2 + 44; // 2 bytes per sample (16-bit)
+            const numChannels = buffer.numberOfChannels;
+            const sampleRate = buffer.sampleRate;
+            const length = buffer.length * numChannels * 2 + 44;
             const wavBuffer = new ArrayBuffer(length);
             const view = new DataView(wavBuffer);
 
-            // Write WAV header
             writeString(view, 0, 'RIFF');
-            view.setUint32(4, 36 + buffer.length * numOfChan * 2, true); // ChunkSize
+            view.setUint32(4, 36 + buffer.length * numChannels * 2, true);
             writeString(view, 8, 'WAVE');
             writeString(view, 12, 'fmt ');
-            view.setUint32(16, 16, true); // Subchunk1Size (PCM)
-            view.setUint16(20, 1, true); // AudioFormat (PCM)
-            view.setUint16(22, numOfChan, true); // NumChannels
-            view.setUint32(24, buffer.sampleRate, true); // SampleRate
-            view.setUint32(28, buffer.sampleRate * numOfChan * 2, true); // ByteRate
-            view.setUint16(32, numOfChan * 2, true); // BlockAlign
-            view.setUint16(34, 16, true); // BitsPerSample
+            view.setUint32(16, 16, true);             // Subchunk1Size
+            view.setUint16(20, 1, true);              // AudioFormat = PCM
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * numChannels * 2, true);
+            view.setUint16(32, numChannels * 2, true);
+            view.setUint16(34, 16, true);             // Bits per sample
             writeString(view, 36, 'data');
-            view.setUint32(40, buffer.length * numOfChan * 2, true); // Subchunk2Size
+            view.setUint32(40, buffer.length * numChannels * 2, true);
 
-            // Write interleaved data (16-bit signed integers)
             let offset = 44;
             for (let i = 0; i < buffer.length; i++) {
-                for (let channel = 0; channel < numOfChan; channel++) {
+                for (let channel = 0; channel < numChannels; channel++) {
                     const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i]));
                     view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
                     offset += 2;
@@ -114,7 +177,6 @@
             return new Blob([wavBuffer], { type: 'audio/wav' });
         }
 
-        // Helper to write string to DataView
         function writeString(view, offset, string) {
             for (let i = 0; i < string.length; i++) {
                 view.setUint8(offset + i, string.charCodeAt(i));
