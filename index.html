@@ -4,28 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audio Repeater - Repeat & Speed Change</title>
-    <meta name="description" content="Upload audio, choose repeat count and playback speed, get one combined file.">
+    <meta name="description" content="Upload audio, choose repeat count and playback speed, get one combined file with preserved pitch.">
     <meta name="theme-color" content="#4f46e5">
     <link rel="manifest" href="manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <!-- SoundTouch.js for high-quality pitch-preserving time-stretching -->
-    <script src="https://cdn.jsdelivr.net/npm/soundtouchjs@0.1.8/dist/soundtouch.min.js"></script>
 </head>
 <body>
     <header>
         <div class="container">
             <h1 class="logo">Audio Repeater</h1>
-            <p class="tagline">Repeat and speed up your audio files — online & free</p>
+            <p class="tagline">Repeat and speed up your audio files — pitch preserved</p>
         </div>
     </header>
 
     <main>
         <div class="container">
             <div class="tool-card">
-                <p class="subtitle">Upload audio, choose how many times to repeat and playback speed, then download one file.</p>
+                <p class="subtitle">Upload audio, choose repeats and speed — pitch stays natural even at higher speeds.</p>
 
                 <div class="form-group">
                     <label>Select or Drop Audio File</label>
@@ -42,13 +40,16 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Playback Speed</label>
+                    <label>Playback Speed (pitch preserved)</label>
                     <div class="speed-buttons">
-                        <label><input type="radio" name="speed" value="1" checked> 1× </label>
+                        <label><input type="radio" name="speed" value="1" checked> 1× (normal)</label>
+                        <label><input type="radio" name="speed" value="1.25"> 1.25×</label>
                         <label><input type="radio" name="speed" value="1.5"> 1.5×</label>
                         <label><input type="radio" name="speed" value="2"> 2×</label>
-                        <label><input type="radio" name="speed" value="3"> 3×</label>
                     </div>
+                    <p style="font-size: 0.85rem; color: var(--gray); margin-top: 8px;">
+                        Note: Higher speeds may introduce minor robotic/warble artifacts (normal for time-stretching).
+                    </p>
                 </div>
 
                 <button id="processButton">Process Audio</button>
