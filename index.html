@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audio Repeater - Professional Audio Repeating Tool</title>
-    <meta name="description" content="Repeat your audio files seamlessly online. Upload, set repeats, and download in seconds. Free and easy to use.">
+    <title>Audio Repeater - Repeat Audio Files Online</title>
+    <meta name="description" content="Upload your audio file, set the number of repeats, and download one combined file. Free and simple.">
     <meta name="theme-color" content="#4f46e5">
     <link rel="manifest" href="manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,20 +13,20 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header class="header">
+    <header>
         <div class="container">
             <h1 class="logo">Audio Repeater</h1>
-            <p class="tagline">Loop your audio files professionally – online & free</p>
+            <p class="tagline">Repeat your audio files easily — online & free</p>
         </div>
     </header>
 
-    <main class="main">
+    <main>
         <div class="container">
             <div class="tool-card">
-                <p class="subtitle">Upload your audio, choose repeat count, and get a single repeated file. Inspired by top tools like Kapwing and Maztr for a clean, efficient experience.</p>
+                <p class="subtitle">Upload your audio, choose how many times to repeat it, and download one combined file.</p>
 
                 <div class="form-group">
-                    <label for="audioFile">Select or Drop Audio File</label>
+                    <label>Select or Drop Audio File</label>
                     <div id="dropArea" class="drop-area">
                         <p>Drag & drop your file here or click to browse</p>
                         <input type="file" id="audioFile" accept="audio/*">
@@ -39,12 +39,12 @@
                     <input type="number" id="repeats" min="1" placeholder="e.g. 5, 10, 20" required>
                 </div>
 
-                <button id="repeatButton" onclick="repeatAudio()">Repeat Audio</button>
+                <button id="repeatButton">Repeat Audio</button>
 
                 <div id="status"></div>
 
                 <div id="previewSection" style="display: none;">
-                    <h3>Preview Your Repeated Audio</h3>
+                    <h3>Preview Repeated Audio</h3>
                     <audio id="audioPreview" controls></audio>
                 </div>
 
@@ -53,10 +53,8 @@
         </div>
     </main>
 
-    <footer class="footer">
-        <div class="container">
-            <p>&copy; 2026 Audio Repeater. Built with ❤️ by data-analysis-bi. Powered by Web Audio API.</p>
-        </div>
+    <footer>
+        <p>© Audio Repeater — Built with Web Audio API</p>
     </footer>
 
     <script src="script.js"></script>
