@@ -3,321 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audio Repeater - Repeat Your Audio Easily</title>
+    <title>Audio Repeater - Professional Audio Repeating Tool</title>
+    <meta name="description" content="Repeat your audio files seamlessly online. Upload, set repeats, and download in seconds. Free and easy to use.">
     <meta name="theme-color" content="#4f46e5">
     <link rel="manifest" href="manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --primary: #4f46e5;      /* Indigo */
-            --primary-dark: #4338ca;
-            --success: #10b981;
-            --gray: #6b7280;
-            --light: #f9fafb;
-            --dark: #111827;
-            --shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
-            color: var(--dark);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .container {
-            background: white;
-            border-radius: 16px;
-            box-shadow: var(--shadow);
-            padding: 32px;
-            max-width: 480px;
-            width: 100%;
-            text-align: center;
-        }
-
-        h1 {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 12px;
-            color: var(--dark);
-        }
-
-        p.subtitle {
-            color: var(--gray);
-            margin-bottom: 32px;
-            font-size: 1.05rem;
-        }
-
-        .form-group {
-            margin-bottom: 24px;
-            text-align: left;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: var(--dark);
-        }
-
-        input[type="file"] {
-            display: none;
-        }
-
-        .file-label {
-            display: block;
-            background: var(--light);
-            border: 2px dashed var(--gray);
-            border-radius: 12px;
-            padding: 24px 16px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .file-label:hover {
-            border-color: var(--primary);
-            background: rgba(79, 70, 229, 0.05);
-        }
-
-        .file-name {
-            margin-top: 12px;
-            font-size: 0.95rem;
-            color: var(--gray);
-            word-break: break-all;
-        }
-
-        input[type="number"] {
-            width: 100%;
-            padding: 14px 16px;
-            border: 1px solid #d1d5db;
-            border-radius: 10px;
-            font-size: 1rem;
-            transition: border-color 0.2s;
-        }
-
-        input[type="number"]:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
-        }
-
-        button {
-            width: 100%;
-            padding: 16px;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.25s ease;
-            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
-        }
-
-        button:hover {
-            background: var(--primary-dark);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3);
-        }
-
-        button:active {
-            transform: translateY(0);
-        }
-
-        #status {
-            margin: 24px 0;
-            font-weight: 600;
-            min-height: 1.4em;
-            transition: color 0.3s;
-        }
-
-        #status.processing { color: var(--primary); }
-        #status.success { color: var(--success); }
-        #status.error { color: #ef4444; }
-
-        #download {
-            display: none;
-            width: 100%;
-            padding: 16px;
-            margin-top: 16px;
-            background: var(--success);
-            color: white;
-            border-radius: 10px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            text-decoration: none;
-            transition: all 0.25s ease;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
-        }
-
-        #download:hover {
-            background: #059669;
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
-        }
-
-        @media (max-width: 480px) {
-            .container { padding: 24px 20px; }
-            h1 { font-size: 1.8rem; }
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-    <div class="container">
-        <h1>Audio Repeater</h1>
-        <p class="subtitle">Upload audio • Choose repeats • Download one combined file</p>
-
-        <div class="form-group">
-            <label for="audioFile">Select Audio File</label>
-            <label for="audioFile" class="file-label" id="fileLabel">
-                Click to choose file (MP3, WAV, etc.)
-                <div class="file-name" id="fileName"></div>
-            </label>
-            <input type="file" id="audioFile" accept="audio/*">
+    <header class="header">
+        <div class="container">
+            <h1 class="logo">Audio Repeater</h1>
+            <p class="tagline">Loop your audio files professionally – online & free</p>
         </div>
+    </header>
 
-        <div class="form-group">
-            <label for="repeats">Number of Repeats</label>
-            <input type="number" id="repeats" min="1" placeholder="e.g. 5, 10, 20" required>
+    <main class="main">
+        <div class="container">
+            <div class="tool-card">
+                <p class="subtitle">Upload your audio, choose repeat count, and get a single repeated file. Inspired by top tools like Kapwing and Maztr for a clean, efficient experience.</p>
+
+                <div class="form-group">
+                    <label for="audioFile">Select or Drop Audio File</label>
+                    <div id="dropArea" class="drop-area">
+                        <p>Drag & drop your file here or click to browse</p>
+                        <input type="file" id="audioFile" accept="audio/*">
+                        <div class="file-name" id="fileName"></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="repeats">Number of Repeats</label>
+                    <input type="number" id="repeats" min="1" placeholder="e.g. 5, 10, 20" required>
+                </div>
+
+                <button id="repeatButton" onclick="repeatAudio()">Repeat Audio</button>
+
+                <div id="status"></div>
+
+                <div id="previewSection" style="display: none;">
+                    <h3>Preview Your Repeated Audio</h3>
+                    <audio id="audioPreview" controls></audio>
+                </div>
+
+                <a id="download" style="display: none;">Download Repeated Audio (WAV)</a>
+            </div>
         </div>
+    </main>
 
-        <button onclick="repeatAudio()">Repeat Audio</button>
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2026 Audio Repeater. Built with ❤️ by data-analysis-bi. Powered by Web Audio API.</p>
+        </div>
+    </footer>
 
-        <div id="status"></div>
-        <a id="download">Download Repeated Audio (WAV)</a>
-    </div>
-
-    <script>
-        // Show selected file name
-        document.getElementById('audioFile').addEventListener('change', function(e) {
-            const fileNameEl = document.getElementById('fileName');
-            fileNameEl.textContent = e.target.files[0]?.name || '';
-        });
-
-        async function repeatAudio() {
-            const fileInput = document.getElementById('audioFile');
-            const repeatsInput = document.getElementById('repeats');
-            const downloadLink = document.getElementById('download');
-            const status = document.getElementById('status');
-
-            const file = fileInput.files[0];
-            const repeats = parseInt(repeatsInput.value);
-
-            if (!file) return alert('Please select an audio file.');
-            if (isNaN(repeats) || repeats < 1) return alert('Enter a valid number ≥ 1.');
-
-            downloadLink.style.display = 'none';
-            status.textContent = 'Starting...';
-            status.className = 'processing';
-
-            try {
-                status.textContent = 'Decoding audio... (1/3)';
-                
-                const arrayBuffer = await file.arrayBuffer();
-                const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const originalBuffer = await tempCtx.decodeAudioData(arrayBuffer);
-
-                status.textContent = 'Preparing repeat... (2/3)';
-
-                const totalSamples = originalBuffer.length * repeats;
-                if (totalSamples > 100_000_000) {
-                    const approxMin = Math.round(totalSamples / originalBuffer.sampleRate / 60);
-                    if (!confirm(`Large file (~${approxMin} min). May take time or crash tab. Continue?`)) {
-                        status.textContent = 'Cancelled';
-                        return;
-                    }
-                }
-
-                const offlineCtx = new OfflineAudioContext(
-                    originalBuffer.numberOfChannels,
-                    totalSamples,
-                    originalBuffer.sampleRate
-                );
-
-                const source = offlineCtx.createBufferSource();
-                source.buffer = originalBuffer;
-                source.loop = true;
-                source.connect(offlineCtx.destination);
-
-                source.start(0);
-                source.stop(originalBuffer.duration * repeats);
-
-                status.textContent = 'Rendering... (3/3) — please wait';
-                
-                const renderedBuffer = await offlineCtx.startRendering();
-
-                status.textContent = 'Finalizing file...';
-                
-                const wavBlob = audioBufferToWav(renderedBuffer);
-
-                const url = URL.createObjectURL(wavBlob);
-                downloadLink.href = url;
-                downloadLink.download = 'repeated_audio.wav';
-                downloadLink.style.display = 'block';
-
-                status.textContent = 'Ready! Click download below ↓';
-                status.className = 'success';
-
-            } catch (error) {
-                console.error(error);
-                status.textContent = 'Error: ' + (error.message || 'Processing failed');
-                status.className = 'error';
-                alert('Error: ' + (error.message || 'Try another file or fewer repeats.'));
-            }
-        }
-
-        function audioBufferToWav(buffer) {
-            const numChannels = buffer.numberOfChannels;
-            const sampleRate = buffer.sampleRate;
-            const length = buffer.length * numChannels * 2 + 44;
-            const arrayBuffer = new ArrayBuffer(length);
-            const view = new DataView(arrayBuffer);
-
-            writeString(view, 0, 'RIFF');
-            view.setUint32(4, 36 + buffer.length * numChannels * 2, true);
-            writeString(view, 8, 'WAVE');
-            writeString(view, 12, 'fmt ');
-            view.setUint32(16, 16, true);
-            view.setUint16(20, 1, true);
-            view.setUint16(22, numChannels, true);
-            view.setUint32(24, sampleRate, true);
-            view.setUint32(28, sampleRate * numChannels * 2, true);
-            view.setUint16(32, numChannels * 2, true);
-            view.setUint16(34, 16, true);
-            writeString(view, 36, 'data');
-            view.setUint32(40, buffer.length * numChannels * 2, true);
-
-            let offset = 44;
-            for (let i = 0; i < buffer.length; i++) {
-                for (let channel = 0; channel < numChannels; channel++) {
-                    const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i]));
-                    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-                    offset += 2;
-                }
-            }
-
-            return new Blob([arrayBuffer], { type: 'audio/wav' });
-        }
-
-        function writeString(view, offset, string) {
-            for (let i = 0; i < string.length; i++) {
-                view.setUint8(offset + i, string.charCodeAt(i));
-            }
-        }
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
