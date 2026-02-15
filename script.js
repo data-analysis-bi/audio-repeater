@@ -5,14 +5,15 @@ const status      = document.getElementById('status');
 const download    = document.getElementById('download');
 const previewSec  = document.getElementById('previewSection');
 const audioPrev   = document.getElementById('audioPreview');
-const repeatBtn   = document.getElementById('repeatButton');
+const durationInfo = document.getElementById('durationInfo');
+const processBtn  = document.getElementById('processButton');
 const progressContainer = document.getElementById('progressContainer');
 const progressFill = document.getElementById('progressFill');
 const progressText = document.getElementById('progressText');
 
 let selectedSpeed = 1;
 
-// Drag & drop setup (keep your existing code)
+// Drag & drop (your existing code - keep it)
 dropArea.addEventListener('click', () => fileInput.click());
 
 fileInput.addEventListener('change', (e) => {
@@ -20,118 +21,102 @@ fileInput.addEventListener('change', (e) => {
     fileNameEl.textContent = file ? file.name : '';
 });
 
-// ... keep your dragenter, dragover, dragleave, drop handlers ...
+// ... your drag events here ...
 
-// Listen for speed selection
 document.querySelectorAll('input[name="speed"]').forEach(radio => {
-    radio.addEventListener('change', (e) => {
-        selectedSpeed = parseFloat(e.target.value);
-    });
+    radio.addEventListener('change', e => selectedSpeed = parseFloat(e.target.value));
 });
 
-repeatBtn.addEventListener('click', processAudio);
+processBtn.addEventListener('click', processAudio);
 
 async function processAudio() {
     const file = fileInput.files[0];
     const repeats = parseInt(document.getElementById('repeats').value);
 
     if (!file) return alert('Please select an audio file first.');
-    if (isNaN(repeats) || repeats < 1) return alert('Please enter a number ≥ 1.');
+    if (isNaN(repeats) || repeats < 1) return alert('Enter repeats ≥ 1.');
 
-    repeatBtn.disabled = true;
+    processBtn.disabled = true;
+    processBtn.textContent = 'Processing...';
     download.style.display = 'none';
     previewSec.style.display = 'none';
-    status.textContent = 'Starting...';
+    status.textContent = 'Loading...';
     status.className = 'processing';
 
     progressContainer.style.display = 'block';
     progressFill.style.width = '0%';
-    progressText.textContent = 'Preparing...';
+    progressText.textContent = 'Decoding...';
 
     try {
-        status.textContent = 'Decoding audio...';
-        progressText.textContent = 'Loading file...';
-
         const arrayBuffer = await file.arrayBuffer();
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const originalBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
-        // ────────────────────────────────────────────────
-        // Step 1: Apply speed change (time stretch)
-        // ────────────────────────────────────────────────
-        let processedBuffer = originalBuffer;
+        let workingBuffer = originalBuffer;
 
+        // Apply speed change
         if (selectedSpeed !== 1) {
-            status.textContent = `Applying ${selectedSpeed}× speed...`;
+            status.textContent = `Speed → ${selectedSpeed}× ...`;
             progressText.textContent = 'Time stretching...';
 
-            const offlineSpeed = new OfflineAudioContext(
+            const newLength = Math.floor(originalBuffer.length / selectedSpeed);
+            const speedCtx = new OfflineAudioContext(
                 originalBuffer.numberOfChannels,
-                originalBuffer.length / selectedSpeed,
+                newLength,
                 originalBuffer.sampleRate
             );
 
-            const sourceSpeed = offlineSpeed.createBufferSource();
-            sourceSpeed.buffer = originalBuffer;
-            sourceSpeed.playbackRate.value = selectedSpeed;
-            sourceSpeed.connect(offlineSpeed.destination);
-            sourceSpeed.start();
+            const src = speedCtx.createBufferSource();
+            src.buffer = originalBuffer;
+            src.playbackRate.value = selectedSpeed;
+            src.connect(speedCtx.destination);
+            src.start(0);
 
-            processedBuffer = await offlineSpeed.startRendering();
+            workingBuffer = await speedCtx.startRendering();
         }
 
-        // ────────────────────────────────────────────────
-        // Step 2: Apply repeats
-        // ────────────────────────────────────────────────
-        status.textContent = 'Repeating audio...';
-        progressText.textContent = 'Building final audio...';
+        // Apply repeats using copy (more stable than loop for offline)
+        status.textContent = `Repeating ${repeats}× ...`;
+        progressText.textContent = 'Combining...';
 
-        const totalSamples = processedBuffer.length * repeats;
-
-        if (totalSamples > 100_000_000) {
-            const approxMin = Math.round(totalSamples / processedBuffer.sampleRate / 60);
-            if (!confirm(`Large output (~${approxMin} min). May be slow or crash tab. Continue?`)) {
-                resetUI();
-                return;
-            }
-        }
-
-        const offlineRepeat = new OfflineAudioContext(
-            processedBuffer.numberOfChannels,
-            totalSamples,
-            processedBuffer.sampleRate
+        const finalLength = workingBuffer.length * repeats;
+        const finalCtx = new OfflineAudioContext(
+            workingBuffer.numberOfChannels,
+            finalLength,
+            workingBuffer.sampleRate
         );
 
-        const sourceRepeat = offlineRepeat.createBufferSource();
-        sourceRepeat.buffer = processedBuffer;
-        sourceRepeat.loop = true;
-        sourceRepeat.connect(offlineRepeat.destination);
+        const finalBuffer = finalCtx.createBuffer(
+            workingBuffer.numberOfChannels,
+            finalLength,
+            workingBuffer.sampleRate
+        );
 
-        sourceRepeat.start(0);
-        sourceRepeat.stop(processedBuffer.duration * repeats);
+        let progress = 0;
+        progressFill.style.width = '0%';
 
-        let progress = 10;
-        progressFill.style.width = progress + '%';
-        const interval = setInterval(() => {
-            if (progress < 92) {
-                progress += Math.random() * 6 + 3;
-                progress = Math.min(progress, 92);
-                progressFill.style.width = progress + '%';
+        for (let r = 0; r < repeats; r++) {
+            for (let ch = 0; ch < workingBuffer.numberOfChannels; ch++) {
+                const srcData = workingBuffer.getChannelData(ch);
+                const dstData = finalBuffer.getChannelData(ch);
+                dstData.set(srcData, r * workingBuffer.length);
             }
-        }, 500);
+            progress = ((r + 1) / repeats) * 100;
+            progressFill.style.width = progress + '%';
+            await new Promise(r => setTimeout(r, 0)); // allow UI update
+        }
 
-        const finalBuffer = await offlineRepeat.startRendering();
-
-        clearInterval(interval);
         progressFill.style.width = '100%';
-        progressText.textContent = 'Finalizing file...';
+        progressText.textContent = 'Finalizing...';
 
-        status.textContent = 'Creating download file...';
         const wavBlob = audioBufferToWav(finalBuffer);
         const url = URL.createObjectURL(wavBlob);
 
         audioPrev.src = url;
         previewSec.style.display = 'block';
+
+        const durationSec = finalBuffer.duration;
+        durationInfo.textContent = `Duration: ${Math.floor(durationSec / 60)} min ${Math.round(durationSec % 60)} sec`;
 
         download.href = url;
         download.download = 'processed_audio.wav';
@@ -139,30 +124,22 @@ async function processAudio() {
 
         status.textContent = `Done! (${selectedSpeed}× speed, ${repeats}× repeat)`;
         status.className = 'success';
-        progressText.textContent = 'Ready to download';
 
     } catch (err) {
-        console.error('Processing failed:', err);
-        status.textContent = 'Error: ' + (err.message || 'Failed to process');
+        console.error('Audio processing error:', err);
+        status.textContent = 'Error: ' + (err.message || 'Processing failed');
         status.className = 'error';
         progressText.textContent = 'Failed';
-        alert('Error: ' + (err.message || 'Could not process the audio. Try a different file or lower repeats/speed.'));
+        alert('Error processing audio: ' + (err.message || 'Unknown issue. Try smaller file/repeats or different browser.'));
     } finally {
-        repeatBtn.disabled = false;
-        setTimeout(() => {
-            progressContainer.style.display = 'none';
-        }, 2000);
+        processBtn.disabled = false;
+        processBtn.textContent = 'Process Audio';
+        setTimeout(() => progressContainer.style.display = 'none', 2500);
     }
 }
 
-function resetUI() {
-    repeatBtn.disabled = false;
-    progressContainer.style.display = 'none';
-    status.textContent = '';
-    status.className = '';
-}
-
 function audioBufferToWav(buffer) {
+    // Your existing function - keep it unchanged
     const numChannels = buffer.numberOfChannels;
     const sampleRate = buffer.sampleRate;
     const length = buffer.length * numChannels * 2 + 44;
