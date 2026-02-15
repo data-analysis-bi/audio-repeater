@@ -1,54 +1,32 @@
-const dropArea     = document.getElementById('dropArea');
-const fileInput    = document.getElementById('audioFile');
-const fileNameEl   = document.getElementById('fileName');
-const status       = document.getElementById('status');
-const download     = document.getElementById('download');
-const previewSec   = document.getElementById('previewSection');
-const audioPrev    = document.getElementById('audioPreview');
-const repeatBtn    = document.getElementById('repeatButton');
+const dropArea    = document.getElementById('dropArea');
+const fileInput   = document.getElementById('audioFile');
+const fileNameEl  = document.getElementById('fileName');
+const status      = document.getElementById('status');
+const download    = document.getElementById('download');
+const previewSec  = document.getElementById('previewSection');
+const audioPrev   = document.getElementById('audioPreview');
+const repeatBtn   = document.getElementById('repeatButton');
 const progressContainer = document.getElementById('progressContainer');
 const progressFill = document.getElementById('progressFill');
 const progressText = document.getElementById('progressText');
 
-// Speed button logic
 let selectedSpeed = 1;
-document.querySelectorAll('.speed-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        selectedSpeed = parseFloat(btn.dataset.speed);
-    });
-});
 
-// Drag & drop
+// Drag & drop setup (keep your existing code)
 dropArea.addEventListener('click', () => fileInput.click());
 
-fileInput.addEventListener('change', e => {
+fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     fileNameEl.textContent = file ? file.name : '';
 });
 
-// Drag events
-['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
-    dropArea.addEventListener(evt, e => e.preventDefault() && e.stopPropagation(), false);
-});
+// ... keep your dragenter, dragover, dragleave, drop handlers ...
 
-['dragenter', 'dragover'].forEach(evt => {
-    dropArea.addEventListener(evt, () => dropArea.classList.add('dragover'), false);
-});
-
-['dragleave', 'drop'].forEach(evt => {
-    dropArea.addEventListener(evt, () => dropArea.classList.remove('dragover'), false);
-});
-
-dropArea.addEventListener('drop', e => {
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('audio/')) {
-        fileInput.files = e.dataTransfer.files;
-        fileNameEl.textContent = file.name;
-    } else {
-        alert('Please drop an audio file.');
-    }
+// Listen for speed selection
+document.querySelectorAll('input[name="speed"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        selectedSpeed = parseFloat(e.target.value);
+    });
 });
 
 repeatBtn.addEventListener('click', processAudio);
@@ -58,7 +36,7 @@ async function processAudio() {
     const repeats = parseInt(document.getElementById('repeats').value);
 
     if (!file) return alert('Please select an audio file first.');
-    if (isNaN(repeats) || repeats < 1) return alert('Please enter a valid number of repeats ≥ 1.');
+    if (isNaN(repeats) || repeats < 1) return alert('Please enter a number ≥ 1.');
 
     repeatBtn.disabled = true;
     download.style.display = 'none';
@@ -75,40 +53,64 @@ async function processAudio() {
         progressText.textContent = 'Loading file...';
 
         const arrayBuffer = await file.arrayBuffer();
-        const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const originalBuffer = await tempCtx.decodeAudioData(arrayBuffer);
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const originalBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
-        status.textContent = 'Processing (repeat + speed)...';
-        progressText.textContent = 'Applying speed & repeats...';
+        // ────────────────────────────────────────────────
+        // Step 1: Apply speed change (time stretch)
+        // ────────────────────────────────────────────────
+        let processedBuffer = originalBuffer;
 
-        const totalDuration = originalBuffer.duration * repeats;
-        const totalSamples = originalBuffer.length * repeats;
+        if (selectedSpeed !== 1) {
+            status.textContent = `Applying ${selectedSpeed}× speed...`;
+            progressText.textContent = 'Time stretching...';
+
+            const offlineSpeed = new OfflineAudioContext(
+                originalBuffer.numberOfChannels,
+                originalBuffer.length / selectedSpeed,
+                originalBuffer.sampleRate
+            );
+
+            const sourceSpeed = offlineSpeed.createBufferSource();
+            sourceSpeed.buffer = originalBuffer;
+            sourceSpeed.playbackRate.value = selectedSpeed;
+            sourceSpeed.connect(offlineSpeed.destination);
+            sourceSpeed.start();
+
+            processedBuffer = await offlineSpeed.startRendering();
+        }
+
+        // ────────────────────────────────────────────────
+        // Step 2: Apply repeats
+        // ────────────────────────────────────────────────
+        status.textContent = 'Repeating audio...';
+        progressText.textContent = 'Building final audio...';
+
+        const totalSamples = processedBuffer.length * repeats;
 
         if (totalSamples > 100_000_000) {
-            const approxMin = Math.round(totalDuration / 60);
-            if (!confirm(`Large result (~${approxMin} min). May take time or crash. Continue?`)) {
+            const approxMin = Math.round(totalSamples / processedBuffer.sampleRate / 60);
+            if (!confirm(`Large output (~${approxMin} min). May be slow or crash tab. Continue?`)) {
                 resetUI();
                 return;
             }
         }
 
-        const offlineCtx = new OfflineAudioContext(
-            originalBuffer.numberOfChannels,
-            originalBuffer.length * repeats,
-            originalBuffer.sampleRate
+        const offlineRepeat = new OfflineAudioContext(
+            processedBuffer.numberOfChannels,
+            totalSamples,
+            processedBuffer.sampleRate
         );
 
-        const source = offlineCtx.createBufferSource();
-        source.buffer = originalBuffer;
-        source.playbackRate.value = selectedSpeed;   // ← speed applied here
-        source.loop = true;
-        source.connect(offlineCtx.destination);
+        const sourceRepeat = offlineRepeat.createBufferSource();
+        sourceRepeat.buffer = processedBuffer;
+        sourceRepeat.loop = true;
+        sourceRepeat.connect(offlineRepeat.destination);
 
-        source.start(0);
-        source.stop(totalDuration / selectedSpeed);  // adjust stop time for speed
+        sourceRepeat.start(0);
+        sourceRepeat.stop(processedBuffer.duration * repeats);
 
-        // Progress simulation
-        let progress = 5;
+        let progress = 10;
         progressFill.style.width = progress + '%';
         const interval = setInterval(() => {
             if (progress < 92) {
@@ -116,23 +118,23 @@ async function processAudio() {
                 progress = Math.min(progress, 92);
                 progressFill.style.width = progress + '%';
             }
-        }, 600);
+        }, 500);
 
-        const renderedBuffer = await offlineCtx.startRendering();
+        const finalBuffer = await offlineRepeat.startRendering();
 
         clearInterval(interval);
         progressFill.style.width = '100%';
-        progressText.textContent = 'Creating file...';
+        progressText.textContent = 'Finalizing file...';
 
-        status.textContent = 'Finalizing...';
-        const wavBlob = audioBufferToWav(renderedBuffer);
+        status.textContent = 'Creating download file...';
+        const wavBlob = audioBufferToWav(finalBuffer);
         const url = URL.createObjectURL(wavBlob);
 
         audioPrev.src = url;
         previewSec.style.display = 'block';
 
         download.href = url;
-        download.download = `repeated_${selectedSpeed}x_${repeats}times.wav`;
+        download.download = 'processed_audio.wav';
         download.style.display = 'block';
 
         status.textContent = `Done! (${selectedSpeed}× speed, ${repeats}× repeat)`;
@@ -140,14 +142,16 @@ async function processAudio() {
         progressText.textContent = 'Ready to download';
 
     } catch (err) {
-        console.error(err);
-        status.textContent = 'Error: ' + (err.message || 'Processing failed');
+        console.error('Processing failed:', err);
+        status.textContent = 'Error: ' + (err.message || 'Failed to process');
         status.className = 'error';
-        progressText.textContent = 'Failed – check console (F12)';
-        alert('Error: ' + (err.message || 'Could not process audio. Try smaller file/repeats.'));
+        progressText.textContent = 'Failed';
+        alert('Error: ' + (err.message || 'Could not process the audio. Try a different file or lower repeats/speed.'));
     } finally {
         repeatBtn.disabled = false;
-        setTimeout(() => progressContainer.style.display = 'none', 2000);
+        setTimeout(() => {
+            progressContainer.style.display = 'none';
+        }, 2000);
     }
 }
 
