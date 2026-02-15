@@ -1,3 +1,5 @@
+console.log("script.js loaded");
+
 const dropArea    = document.getElementById('dropArea');
 const fileInput   = document.getElementById('audioFile');
 const fileNameEl  = document.getElementById('fileName');
@@ -13,21 +15,57 @@ const progressText = document.getElementById('progressText');
 
 let selectedSpeed = 1;
 
-// Drag & drop (your existing code - keep it)
-dropArea.addEventListener('click', () => fileInput.click());
+// Safety check
+if (!processBtn) console.error("processButton not found in HTML");
+if (!progressContainer) console.error("progressContainer not found");
 
-fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    fileNameEl.textContent = file ? file.name : '';
-});
+// Drag & drop
+if (dropArea) {
+    dropArea.addEventListener('click', () => fileInput.click());
 
-// ... your drag events here ...
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        fileNameEl.textContent = file ? file.name : '';
+    });
 
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+        dropArea.addEventListener(evt, e => {
+            e.preventDefault();
+            e.stopPropagation();
+        }, false);
+    });
+
+    ['dragenter', 'dragover'].forEach(evt => {
+        dropArea.addEventListener(evt, () => dropArea.classList.add('dragover'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(evt => {
+        dropArea.addEventListener(evt, () => dropArea.classList.remove('dragover'), false);
+    });
+
+    dropArea.addEventListener('drop', (e) => {
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('audio/')) {
+            fileInput.files = e.dataTransfer.files;
+            fileNameEl.textContent = file.name;
+        } else {
+            alert('Please drop an audio file.');
+        }
+    });
+}
+
+// Speed selection
 document.querySelectorAll('input[name="speed"]').forEach(radio => {
-    radio.addEventListener('change', e => selectedSpeed = parseFloat(e.target.value));
+    radio.addEventListener('change', e => {
+        selectedSpeed = parseFloat(e.target.value);
+        console.log("Speed set to:", selectedSpeed);
+    });
 });
 
-processBtn.addEventListener('click', processAudio);
+// Process button
+if (processBtn) {
+    processBtn.addEventListener('click', processAudio);
+}
 
 async function processAudio() {
     const file = fileInput.files[0];
@@ -54,7 +92,7 @@ async function processAudio() {
 
         let workingBuffer = originalBuffer;
 
-        // Apply speed change
+        // Speed change
         if (selectedSpeed !== 1) {
             status.textContent = `Speed → ${selectedSpeed}× ...`;
             progressText.textContent = 'Time stretching...';
@@ -75,35 +113,29 @@ async function processAudio() {
             workingBuffer = await speedCtx.startRendering();
         }
 
-        // Apply repeats using copy (more stable than loop for offline)
+        // Repeat
         status.textContent = `Repeating ${repeats}× ...`;
         progressText.textContent = 'Combining...';
 
         const finalLength = workingBuffer.length * repeats;
-        const finalCtx = new OfflineAudioContext(
-            workingBuffer.numberOfChannels,
-            finalLength,
-            workingBuffer.sampleRate
-        );
-
-        const finalBuffer = finalCtx.createBuffer(
+        const finalBuffer = audioCtx.createBuffer(
             workingBuffer.numberOfChannels,
             finalLength,
             workingBuffer.sampleRate
         );
 
         let progress = 0;
-        progressFill.style.width = '0%';
-
         for (let r = 0; r < repeats; r++) {
             for (let ch = 0; ch < workingBuffer.numberOfChannels; ch++) {
-                const srcData = workingBuffer.getChannelData(ch);
-                const dstData = finalBuffer.getChannelData(ch);
-                dstData.set(srcData, r * workingBuffer.length);
+                finalBuffer.copyToChannel(
+                    workingBuffer.getChannelData(ch),
+                    ch,
+                    r * workingBuffer.length
+                );
             }
             progress = ((r + 1) / repeats) * 100;
             progressFill.style.width = progress + '%';
-            await new Promise(r => setTimeout(r, 0)); // allow UI update
+            await new Promise(r => setTimeout(r, 0));
         }
 
         progressFill.style.width = '100%';
@@ -126,11 +158,11 @@ async function processAudio() {
         status.className = 'success';
 
     } catch (err) {
-        console.error('Audio processing error:', err);
-        status.textContent = 'Error: ' + (err.message || 'Processing failed');
+        console.error('Processing failed:', err);
+        status.textContent = 'Error: ' + (err.message || 'Failed');
         status.className = 'error';
         progressText.textContent = 'Failed';
-        alert('Error processing audio: ' + (err.message || 'Unknown issue. Try smaller file/repeats or different browser.'));
+        alert('Error: ' + (err.message || 'Try smaller file or different browser.'));
     } finally {
         processBtn.disabled = false;
         processBtn.textContent = 'Process Audio';
@@ -139,7 +171,6 @@ async function processAudio() {
 }
 
 function audioBufferToWav(buffer) {
-    // Your existing function - keep it unchanged
     const numChannels = buffer.numberOfChannels;
     const sampleRate = buffer.sampleRate;
     const length = buffer.length * numChannels * 2 + 44;
